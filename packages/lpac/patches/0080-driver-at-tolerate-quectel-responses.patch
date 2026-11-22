@@ -22,11 +22,9 @@ stdout.
  driver/apdu/at.c | 50 ++++++++++++++++++++++++++++++++++----------------
  1 file changed, 34 insertions(+), 16 deletions(-)
 
-diff --git a/driver/apdu/at.c b/driver/apdu/at.c
-index 21d17ca..be3baa9 100644
 --- a/driver/apdu/at.c
 +++ b/driver/apdu/at.c
-@@ -46,17 +46,30 @@ static int at_expect(char **response, const char *expected) {
+@@ -46,17 +46,30 @@ static int at_expect(char **response, co
          *response = NULL;
  
      while (1) {
@@ -61,7 +59,7 @@ index 21d17ca..be3baa9 100644
          }
      }
      return 0;
-@@ -74,21 +87,20 @@ static int apdu_interface_connect(struct euicc_ctx *ctx) {
+@@ -74,21 +87,20 @@ static int apdu_interface_connect(struct
      }
      setbuf(fuart, NULL);
  
@@ -94,7 +92,7 @@ index 21d17ca..be3baa9 100644
  
      return 0;
  }
-@@ -175,12 +187,18 @@ static int apdu_interface_logic_channel_open(struct euicc_ctx *ctx, const uint8_
+@@ -175,12 +187,18 @@ static int apdu_interface_logic_channel_
      }
      fprintf(fuart, "\"\r\n");
      if (at_expect(&response, "+CCHO: ")) {
