@@ -4,7 +4,7 @@ This directory is a downstream OpenWrt package definition used only by the
 bundled GitHub releases of `luci-app-lpac`. It downloads the authoritative
 lpac `v2.3.0` source archive instead of vendoring a modified source tree.
 
-The package uses the official OpenWrt version format `2.3.0-r4`. The runtime
+The package uses the official OpenWrt version format `2.3.0-r5`. The runtime
 `lpac version` output remains the upstream project version `2.3.0`.
 
 Patch provenance:
@@ -30,8 +30,21 @@ Patch provenance:
    asks for a decision before PrepareDownload, even if no metadata was supplied.
 11. The provider-status string hardening merged as lpac pull request 444 /
    commit `3ff35594ec15062a3ed10c3da1c26eb0a13390b8`.
+12. The teardown crash fix merged as lpac pull request 467 / commit
+   `a9b21ac53ec334a86e1903e513d15e21a2f36c78`. Without it, `lpac chip info`
+   crashes after printing its error when the modem rejects the first APDU.
+13. Downstream AT fixes for Quectel modems such as the RM551E-GL: the
+   `AT+CCHO=?`/`AT+CCHC=?`/`AT+CGLA=?` probes are no longer fatal, `+CME ERROR`
+   and `+CMS ERROR` end a command instead of hanging lpac, a closed device
+   stops the read loop, and the bare `<sessionid>` CCHO reply from
+   3GPP TS 27.007 is accepted.
+14. Downstream uqmi fixes: diagnostics (including uqmi's own error text such
+   as `"Not supported"`) go to stderr instead of corrupting lpac's JSON
+   output, the uqmi exit status and channel number are checked, and
+   `LPAC_QMI_UIM_SLOT` (UCI `lpac.uqmi.uim_slot`, `1` or `2`, default `1`)
+   selects the UIM slot instead of hard-coding slot 1.
 
-The patch directory intentionally contains exactly these eleven patches.
+The patch directory intentionally contains exactly these fourteen patches.
 TLS verification and provider-response memory bounds are deferred to later
 work.
 

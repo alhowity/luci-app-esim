@@ -1,0 +1,135 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Amperstrand <141745238+Amperstrand@users.noreply.github.com>
+Date: Sun, 8 Nov 2026 15:38:59 +0100
+Subject: [PATCH] applet: avoid use-before-init for SBRM variables
+
+Backport upstream lpac pull request 467 / commit
+a9b21ac53ec334a86e1903e513d15e21a2f36c78.
+
+Several applets declare _cleanup_ decorated locals without initializing
+them. When an early ES10 call fails, for example because the modem rejects
+the first STORE DATA APDU, teardown frees uninitialized stack values and
+lpac crashes after printing its error JSON. Zero-initialize those locals.
+---
+ src/applet/chip/info.c            | 6 +++---
+ src/applet/notification/dump.c    | 4 ++--
+ src/applet/notification/list.c    | 2 +-
+ src/applet/notification/process.c | 4 ++--
+ src/applet/notification/remove.c  | 2 +-
+ src/applet/notification/replay.c  | 2 +-
+ src/applet/profile/list.c         | 2 +-
+ 7 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/src/applet/chip/info.c b/src/applet/chip/info.c
+index 8dd42f9..dbb7912 100644
+--- a/src/applet/chip/info.c
++++ b/src/applet/chip/info.c
+@@ -14,9 +14,9 @@
+ 
+ static int applet_main(int argc, char **argv) {
+     _cleanup_free_ char *eid = NULL;
+-    _cleanup_(es10a_euicc_configured_addresses_free) struct es10a_euicc_configured_addresses addresses;
+-    _cleanup_es10b_rat_list_ struct es10b_rat *ratList;
+-    _cleanup_(es10c_ex_euiccinfo2_free) struct es10c_ex_euiccinfo2 euiccinfo2;
++    _cleanup_(es10a_euicc_configured_addresses_free) struct es10a_euicc_configured_addresses addresses = {0};
++    _cleanup_es10b_rat_list_ struct es10b_rat *ratList = NULL;
++    _cleanup_(es10c_ex_euiccinfo2_free) struct es10c_ex_euiccinfo2 euiccinfo2 = {0};
+     cJSON *jaddresses = NULL, *jratList = NULL, *jeuiccinfo2 = NULL, *jdata = NULL;
+ 
+     if (es10c_get_eid(&euicc_ctx, &eid)) {
+diff --git a/src/applet/notification/dump.c b/src/applet/notification/dump.c
+index 372f19d..7166787 100644
+--- a/src/applet/notification/dump.c
++++ b/src/applet/notification/dump.c
+@@ -14,7 +14,7 @@
+ #include <unistd.h>
+ 
+ static bool retrieve_notification(const char *eid, const uint32_t seqNumber) {
+-    _cleanup_(es10b_pending_notification_free) struct es10b_pending_notification notification;
++    _cleanup_(es10b_pending_notification_free) struct es10b_pending_notification notification = {0};
+ 
+     if (es10b_retrieve_notifications_list(&euicc_ctx, &notification, seqNumber)) {
+         jprint_error("es10b_retrieve_notifications_list", NULL);
+@@ -61,7 +61,7 @@ static int applet_main(const int argc, char **argv) {
+     }
+ 
+     if (all) {
+-        _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications, *rptr;
++        _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications = NULL, *rptr = NULL;
+ 
+         if (es10b_list_notification(&euicc_ctx, &notifications)) {
+             jprint_error("es10b_list_notification", NULL);
+diff --git a/src/applet/notification/list.c b/src/applet/notification/list.c
+index 92c72fc..e0324b5 100644
+--- a/src/applet/notification/list.c
++++ b/src/applet/notification/list.c
+@@ -11,7 +11,7 @@
+ #include <unistd.h>
+ 
+ static int applet_main(int argc, char **argv) {
+-    _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications, *rptr;
++    _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications = NULL, *rptr = NULL;
+     cJSON *jdata = NULL;
+ 
+     if (es10b_list_notification(&euicc_ctx, &notifications)) {
+diff --git a/src/applet/notification/process.c b/src/applet/notification/process.c
+index b32dec2..b68020e 100644
+--- a/src/applet/notification/process.c
++++ b/src/applet/notification/process.c
+@@ -16,7 +16,7 @@
+ static int _process_single(uint32_t seqNumber, uint8_t autoremove) {
+     int ret;
+     char str_seqNumber[11];
+-    _cleanup_(es10b_pending_notification_free) struct es10b_pending_notification notification;
++    _cleanup_(es10b_pending_notification_free) struct es10b_pending_notification notification = {0};
+ 
+     snprintf(str_seqNumber, sizeof(str_seqNumber), "%u", seqNumber);
+ 
+@@ -84,7 +84,7 @@ static int applet_main(int argc, char **argv) {
+     }
+ 
+     if (all) {
+-        _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications, *rptr;
++        _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications = NULL, *rptr = NULL;
+ 
+         jprint_progress("es10b_list_notification", NULL);
+         if (es10b_list_notification(&euicc_ctx, &notifications)) {
+diff --git a/src/applet/notification/remove.c b/src/applet/notification/remove.c
+index 46f8b66..fb849db 100644
+--- a/src/applet/notification/remove.c
++++ b/src/applet/notification/remove.c
+@@ -58,7 +58,7 @@ static int applet_main(int argc, char **argv) {
+     }
+ 
+     if (all) {
+-        _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications, *rptr;
++        _cleanup_es10b_notification_metadata_list_ struct es10b_notification_metadata_list *notifications = NULL, *rptr = NULL;
+ 
+         jprint_progress("es10b_list_notification", NULL);
+         if (es10b_list_notification(&euicc_ctx, &notifications)) {
+diff --git a/src/applet/notification/replay.c b/src/applet/notification/replay.c
+index f871ad7..6de8ced 100644
+--- a/src/applet/notification/replay.c
++++ b/src/applet/notification/replay.c
+@@ -92,7 +92,7 @@ static int applet_main(const int argc, char **argv) {
+ 
+     size_t n;
+ 
+-    _cleanup_(es10b_pending_notification_free) struct es10b_pending_notification notification;
++    _cleanup_(es10b_pending_notification_free) struct es10b_pending_notification notification = {0};
+ 
+     while (getline(&input, &n, stdin) != -1) {
+         _cleanup_cjson_ cJSON *jroot = cJSON_ParseWithLength(input, n);
+diff --git a/src/applet/profile/list.c b/src/applet/profile/list.c
+index b01a7e8..4caefe6 100644
+--- a/src/applet/profile/list.c
++++ b/src/applet/profile/list.c
+@@ -11,7 +11,7 @@
+ #include <unistd.h>
+ 
+ static int applet_main(int argc, char **argv) {
+-    _cleanup_es10c_profile_info_list_ struct es10c_profile_info_list *profiles;
++    _cleanup_es10c_profile_info_list_ struct es10c_profile_info_list *profiles = NULL;
+     struct es10c_profile_info_list *rptr;
+     cJSON *jdata = NULL;
+ 

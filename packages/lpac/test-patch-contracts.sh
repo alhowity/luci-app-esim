@@ -66,6 +66,21 @@ assert "copy[length] = '\\0'" in events
 assert "ES11_EVENT_ENTRIES_MAX" in events
 
 assert "PKG_VERSION:=2.3.0" in makefile
-assert "PKG_RELEASE:=4" in makefile
+assert "PKG_RELEASE:=5" in makefile
+
+at_driver = (source / "driver/apdu/at.c").read_text()
+uqmi_driver = (source / "driver/apdu/uqmi.c").read_text()
+chip_info = (source / "src/applet/chip/info.c").read_text()
+
+assert "Device missing AT+CCHO support" not in at_driver
+assert 'strncmp(buffer, "+CME ERROR", 10) == 0' in at_driver
+assert "if (fgets(buffer, AT_BUFFER_SIZE, fuart) == NULL)" in at_driver
+assert 'printf("AT_DEBUG' not in at_driver
+
+assert 'getenv("LPAC_QMI_UIM_SLOT")' in uqmi_driver
+assert "--uim-slot 1" not in uqmi_driver
+assert not re.search(r"(?<![A-Za-z_])printf\(", uqmi_driver)
+
+assert "struct es10c_ex_euiccinfo2 euiccinfo2 = {0};" in chip_info
 assert "+ca-bundle" not in makefile
 PY

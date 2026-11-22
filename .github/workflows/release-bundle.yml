@@ -4,25 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       arch:
-        description: Target package architecture
+        description: Target package architecture (BPI-R4 is aarch64_cortex-a53)
         type: choice
-        default: all
+        default: aarch64_cortex-a53
         options:
-          - all
-          - aarch64_generic
           - aarch64_cortex-a53
+          - aarch64_generic
           - aarch64_cortex-a72
-          - arm_cortex-a7_neon-vfpv4
-          - mipsel_24kc
           - x86_64
-      package_format:
-        description: OpenWrt package format
-        type: choice
-        default: all
-        options:
-          - all
-          - ipk
-          - apk
   push:
     branches:
       - release/bundled-lpac-2.3.0
@@ -48,42 +37,22 @@ jobs:
         id: matrix
         shell: bash
         env:
-          SELECTED_ARCH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && 'x86_64' || inputs.arch || 'all' }}
-          SELECTED_FORMAT: ${{ inputs.package_format || 'all' }}
+          SELECTED_ARCH: ${{ inputs.arch || 'aarch64_cortex-a53' }}
         run: |
           set -euo pipefail
 
-          arches='aarch64_generic aarch64_cortex-a53 aarch64_cortex-a72 arm_cortex-a7_neon-vfpv4 mipsel_24kc x86_64'
-          formats='ipk apk'
-          json='{"include":['
-          separator=''
+          # Latest OpenWrt stable release. OpenWrt 25.12 uses apk packages.
+          openwrt_version='25.12.6'
+          openwrt_major='openwrt25'
+          luci_branch='openwrt-25.12'
+          package_format='apk'
 
-          for arch in ${arches}; do
-            [ "${SELECTED_ARCH}" = 'all' ] || [ "${SELECTED_ARCH}" = "${arch}" ] || continue
+          case "${SELECTED_ARCH}" in
+            aarch64_cortex-a53|aarch64_generic|aarch64_cortex-a72|x86_64) ;;
+            *) echo "Unsupported architecture: ${SELECTED_ARCH}" >&2; exit 1 ;;
+          esac
 
-            for package_format in ${formats}; do
-              [ "${SELECTED_FORMAT}" = 'all' ] || [ "${SELECTED_FORMAT}" = "${package_format}" ] || continue
-
-              case "${package_format}" in
-                ipk)
-                  openwrt_version='24.10.7'
-                  openwrt_major='openwrt24'
-                  luci_branch='openwrt-24.10'
-                  ;;
-                apk)
-                  openwrt_version='25.12.5'
-                  openwrt_major='openwrt25'
-                  luci_branch='openwrt-25.12'
-                  ;;
-              esac
-
-              json="${json}${separator}{\"arch\":\"${arch}\",\"package_format\":\"${package_format}\",\"openwrt_version\":\"${openwrt_version}\",\"openwrt_major\":\"${openwrt_major}\",\"luci_branch\":\"${luci_branch}\",\"sdk_arch\":\"${arch}-${openwrt_version}\"}"
-              separator=','
-            done
-          done
-
-          json="${json}]}"
-          [ "${separator}" = ',' ]
+          json="{\"include\":[{\"arch\":\"${SELECTED_ARCH}\",\"package_format\":\"${package_format}\",\"openwrt_version\":\"${openwrt_version}\",\"openwrt_major\":\"${openwrt_major}\",\"luci_branch\":\"${luci_branch}\",\"sdk_arch\":\"${SELECTED_ARCH}-${openwrt_version}\"}]}"
           echo "matrix=${json}" >> "${GITHUB_OUTPUT}"
           echo "${json}"
 
@@ -131,7 +100,7 @@ jobs:
             build-feed/applications/luci-app-lpac/Makefile
           grep -Fx 'PKG_VERSION:=2.3.0' \
             build-feed/contrib/lpac/Makefile
-          grep -Fx 'PKG_RELEASE:=4' build-feed/contrib/lpac/Makefile
+          grep -Fx 'PKG_RELEASE:=5' build-feed/contrib/lpac/Makefile
 
           source_epoch="$(git log -1 --format=%ct)"
           source_sha="$(git rev-parse --short=12 HEAD)"
@@ -167,16 +136,9 @@ jobs:
         run: |
           set -euxo pipefail
 
-          case "${PACKAGE_FORMAT}" in
-            ipk)
-              lpac_glob="lpac_2.3.0-r4_${ARCH}.ipk"
-              luci_glob='luci-app-lpac_*.ipk'
-              ;;
-            apk)
-              lpac_glob='lpac-2.3.0-r4.apk'
-              luci_glob='luci-app-lpac-*.apk'
-              ;;
-          esac
+          [ "${PACKAGE_FORMAT}" = apk ]
+          lpac_glob='lpac-2.3.0-r5.apk'
+          luci_glob='luci-app-lpac-*.apk'
 
           mapfile -d '' lpac_packages < <(
             find artifacts/bin -type f -name "${lpac_glob}" -print0
@@ -192,7 +154,7 @@ jobs:
           fi
 
           case "$(basename "${luci_packages[0]}")" in
-            luci-app-lpac-0.apk|luci-app-lpac_0_*.ipk)
+            luci-app-lpac-0.apk)
               echo 'Refusing a LuCI package with version 0' >&2
               exit 1
               ;;
@@ -204,16 +166,8 @@ jobs:
 
           lpac_name="$(basename "${lpac_packages[0]}")"
           luci_name="$(basename "${luci_packages[0]}")"
-          case "${PACKAGE_FORMAT}" in
-            ipk)
-              update_command='opkg update'
-              install_command="opkg install ./${lpac_name} ./${luci_name}"
-              ;;
-            apk)
-              update_command='apk update'
-              install_command="apk add --allow-untrusted ./${lpac_name} ./${luci_name}"
-              ;;
-          esac
+          update_command='apk update'
+          install_command="apk add --allow-untrusted ./${lpac_name} ./${luci_name}"
 
           cat > "${bundle_dir}/INSTALL.txt" <<EOF
           luci-app-lpac bundled compatibility build
@@ -242,6 +196,14 @@ jobs:
           ignored and a multi-slot modem may expose a different eUICC.
           The default APDU backend for new installations is uqmi.
           The same option is available in Network > eSIM Manager > Settings.
+
+          Quectel RM551E-GL (e.g. on Banana Pi BPI-R4): use the uqmi backend
+          with the modem in QMI mode (AT+QCFG="usbnet",0) on /dev/cdc-wdm0,
+          or the AT backend on /dev/ttyUSB2. MBIM UICC access is not
+          supported by this modem. If the eUICC is in the second SIM slot:
+
+              uci set lpac.uqmi.uim_slot='2'
+              uci commit lpac
 
           This staged lpac build inherits v2.3.0's curl transport, which does
           not verify the provider certificate chain or hostname. Use network-
@@ -297,7 +259,7 @@ jobs:
             find release-assets -maxdepth 1 -type f \
               -name 'luci-app-lpac-*-openwrt*.zip' -print0
           )
-          [ "${#bundles[@]}" -eq 12 ]
+          [ "${#bundles[@]}" -ge 1 ]
 
           (
             cd release-assets

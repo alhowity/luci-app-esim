@@ -1933,9 +1933,12 @@ function list_modem_ports(backend) {
 				continue;
 
 			const driver = modem_driver_name(path);
-			const expected = backend == 'uqmi' ? 'qmi_wwan' : 'cdc_mbim';
+			/* qmi_wwan_q is Quectel's out-of-tree QMI driver. */
+			const expected = backend == 'uqmi'
+				? [ 'qmi_wwan', 'qmi_wwan_q' ]
+				: [ 'cdc_mbim' ];
 
-			if (driver != expected)
+			if (index(expected, driver) < 0)
 				continue;
 
 			seen[path] = true;
