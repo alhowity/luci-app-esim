@@ -2,12 +2,12 @@
 
 include $(TOPDIR)/rules.mk
 
-LUCI_TITLE:=LuCI support for lpac
+LUCI_TITLE:=LuCI eSIM manager (lpac)
 LUCI_DESCRIPTION:=Manage eUICC information and eSIM profiles with lpac
 LUCI_DEPENDS:=+luci-base +lpac +ucode-mod-uloop
 LUCI_EXTRA_DEPENDS:=lpac (>=2.3.0-r4)
 
-define Package/luci-app-lpac/conffiles
+define Package/luci-app-esim/conffiles
 /etc/config/luci_lpac
 endef
 

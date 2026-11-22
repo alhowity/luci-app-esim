@@ -1,5 +1,5 @@
 {
-	"luci-app-lpac": {
+	"luci-app-esim": {
 		"description": "Grant access to the lpac eSIM manager",
 		"read": {
 			"ubus": {

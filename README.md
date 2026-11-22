@@ -1,7 +1,8 @@
-# luci-app-lpac
+# luci-app-esim
 
 
-Native LuCI frontend for OpenWrt's `lpac` eSIM manager. The application uses
+Native LuCI frontend for OpenWrt's `lpac` eSIM manager, installed as
+`luci-app-esim` under **Modem → eSIM Manager**. The application uses
 the packaged `/usr/bin/lpac` entrypoint and `/etc/config/lpac`.
 
 
@@ -14,13 +15,18 @@ workflow. Its default architecture is `aarch64_cortex-a53`. Then install both pa
 
 ```sh
 apk update
-apk add --allow-untrusted ./lpac-2.3.0-r5.apk ./luci-app-lpac-*.apk
+apk add --allow-untrusted ./lpac-2.3.0-r5.apk ./luci-app-esim-*.apk
 ```
+
+The LuCI package was previously named `luci-app-lpac`. If that package is
+installed, remove it first with `apk del luci-app-lpac`, then install the new
+packages. If the eSIM pages then ask you to choose a backend, save
+**Settings** once more.
 
 Recommended RM551E-GL setup (module in the BPI-R4 M.2 Key-B slot, USB):
 
 1. Put the modem in QMI mode and reboot it: `AT+QCFG="usbnet",0`.
-2. In **Network → eSIM Manager → Settings**, choose the **uqmi** backend and
+2. In **Modem → eSIM Manager → Settings**, choose the **uqmi** backend and
    `/dev/cdc-wdm0` (Detect also finds ports bound to Quectel's `qmi_wwan_q`).
 3. If the eUICC card is in the second SIM slot, select that UIM slot:
 

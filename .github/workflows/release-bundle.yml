@@ -86,8 +86,8 @@ jobs:
             https://github.com/openwrt/luci.git \
             build-feed
 
-          rm -rf build-feed/applications/luci-app-lpac
-          cp -a applications/luci-app-lpac build-feed/applications/
+          rm -rf build-feed/applications/luci-app-esim
+          cp -a applications/luci-app-esim build-feed/applications/
 
           rm -rf build-feed/contrib/lpac
           mkdir -p build-feed/contrib
@@ -95,9 +95,9 @@ jobs:
 
           # Keep both runtime dependencies in the bundled package metadata.
           grep -Fx 'LUCI_DEPENDS:=+luci-base +lpac +ucode-mod-uloop' \
-            build-feed/applications/luci-app-lpac/Makefile
+            build-feed/applications/luci-app-esim/Makefile
           grep -Fx 'LUCI_EXTRA_DEPENDS:=lpac (>=2.3.0-r4)' \
-            build-feed/applications/luci-app-lpac/Makefile
+            build-feed/applications/luci-app-esim/Makefile
           grep -Fx 'PKG_VERSION:=2.3.0' \
             build-feed/contrib/lpac/Makefile
           grep -Fx 'PKG_RELEASE:=5' build-feed/contrib/lpac/Makefile
@@ -106,16 +106,16 @@ jobs:
           source_sha="$(git rev-parse --short=12 HEAD)"
           source_date="$(date -u -d "@${source_epoch}" +%Y-%m-%dT%H:%M:%SZ)"
 
-          git -C build-feed add applications/luci-app-lpac contrib/lpac
+          git -C build-feed add applications/luci-app-esim contrib/lpac
           GIT_AUTHOR_DATE="${source_date}" \
           GIT_COMMITTER_DATE="${source_date}" \
             git -C build-feed \
               -c user.name='GitHub Actions' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit --no-gpg-sign \
-              -m "ci: stage bundled luci-app-lpac ${source_sha}"
+              -m "ci: stage bundled luci-app-esim ${source_sha}"
 
-      - name: Build lpac and luci-app-lpac
+      - name: Build lpac and luci-app-esim
         uses: openwrt/gh-action-sdk@7fc2640243284ecc44f4a9c3f749a61746ee02cb # v11
         env:
           ARCH: ${{ matrix.sdk_arch }}
@@ -123,7 +123,7 @@ jobs:
           BUILD_LOG: 1
           FEED_DIR: ${{ github.workspace }}/build-feed
           FEEDNAME: lpac_bundle
-          PACKAGES: lpac luci-app-lpac
+          PACKAGES: lpac luci-app-esim
           V: s
 
       - name: Verify packages and create ZIP bundle
@@ -138,7 +138,7 @@ jobs:
 
           [ "${PACKAGE_FORMAT}" = apk ]
           lpac_glob='lpac-2.3.0-r5.apk'
-          luci_glob='luci-app-lpac-*.apk'
+          luci_glob='luci-app-esim-*.apk'
 
           mapfile -d '' lpac_packages < <(
             find artifacts/bin -type f -name "${lpac_glob}" -print0
@@ -148,13 +148,13 @@ jobs:
           )
 
           if [ "${#lpac_packages[@]}" -ne 1 ] || [ "${#luci_packages[@]}" -ne 1 ]; then
-            echo "Expected one lpac and one luci-app-lpac package" >&2
+            echo "Expected one lpac and one luci-app-esim package" >&2
             find artifacts/bin -type f -print >&2
             exit 1
           fi
 
           case "$(basename "${luci_packages[0]}")" in
-            luci-app-lpac-0.apk)
+            luci-app-esim-0.apk)
               echo 'Refusing a LuCI package with version 0' >&2
               exit 1
               ;;
@@ -170,7 +170,7 @@ jobs:
           install_command="apk add --allow-untrusted ./${lpac_name} ./${luci_name}"
 
           cat > "${bundle_dir}/INSTALL.txt" <<EOF
-          luci-app-lpac bundled compatibility build
+          luci-app-esim bundled compatibility build
 
           OpenWrt: ${OPENWRT_VERSION}
           Package architecture: ${ARCH}
@@ -179,6 +179,11 @@ jobs:
           Included packages:
           - ${lpac_name}
           - ${luci_name}
+
+          This package was previously named luci-app-lpac. Remove the old
+          package first if it is installed:
+
+              apk del luci-app-lpac
 
           Install both local packages while the matching official OpenWrt feeds
           are reachable so runtime dependencies can be resolved:
@@ -195,7 +200,7 @@ jobs:
           When skip-slot-mapping is enabled, the configured MBIM UIM slot is
           ignored and a multi-slot modem may expose a different eUICC.
           The default APDU backend for new installations is uqmi.
-          The same option is available in Network > eSIM Manager > Settings.
+          The same option is available in Modem > eSIM Manager > Settings.
 
           Quectel RM551E-GL (e.g. on Banana Pi BPI-R4): use the uqmi backend
           with the modem in QMI mode (AT+QCFG="usbnet",0) on /dev/cdc-wdm0,
@@ -216,7 +221,7 @@ jobs:
             cat SHA256SUMS
           )
 
-          zip_name="luci-app-lpac-${ARCH}-${OPENWRT_MAJOR}.${PACKAGE_FORMAT}.zip"
+          zip_name="luci-app-esim-${ARCH}-${OPENWRT_MAJOR}.${PACKAGE_FORMAT}.zip"
           (
             cd "${bundle_dir}"
             zip -9 "${GITHUB_WORKSPACE}/dist/${zip_name}" \
@@ -227,8 +232,8 @@ jobs:
       - name: Upload ZIP bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: luci-app-lpac-${{ matrix.arch }}-${{ matrix.openwrt_major }}.${{ matrix.package_format }}
-          path: dist/luci-app-lpac-${{ matrix.arch }}-${{ matrix.openwrt_major }}.${{ matrix.package_format }}.zip
+          name: luci-app-esim-${{ matrix.arch }}-${{ matrix.openwrt_major }}.${{ matrix.package_format }}
+          path: dist/luci-app-esim-${{ matrix.arch }}-${{ matrix.openwrt_major }}.${{ matrix.package_format }}.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -257,22 +262,22 @@ jobs:
 
           mapfile -d '' bundles < <(
             find release-assets -maxdepth 1 -type f \
-              -name 'luci-app-lpac-*-openwrt*.zip' -print0
+              -name 'luci-app-esim-*-openwrt*.zip' -print0
           )
           [ "${#bundles[@]}" -ge 1 ]
 
           (
             cd release-assets
-            sha256sum luci-app-lpac-*-openwrt*.zip > SHA256SUMS
+            sha256sum luci-app-esim-*-openwrt*.zip > SHA256SUMS
             cat SHA256SUMS
           )
 
       - name: Publish release
         uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         with:
-          name: luci-app-lpac ${{ github.ref_name }} bundled packages
+          name: luci-app-esim ${{ github.ref_name }} bundled packages
           files: |
-            release-assets/luci-app-lpac-*-openwrt*.zip
+            release-assets/luci-app-esim-*-openwrt*.zip
             release-assets/SHA256SUMS
           fail_on_unmatched_files: true
           prerelease: false

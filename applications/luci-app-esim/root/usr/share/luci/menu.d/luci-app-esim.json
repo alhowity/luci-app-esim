@@ -1,16 +1,23 @@
 {
-	"admin/network/lpac": {
+	"admin/modem": {
+		"title": "Modem",
+		"action": {
+			"type": "firstchild"
+		}
+	},
+
+	"admin/modem/esim": {
 		"title": "eSIM Manager",
 		"order": 90,
 		"action": {
 			"type": "firstchild"
 		},
 		"depends": {
-			"acl": [ "luci-app-lpac" ]
+			"acl": [ "luci-app-esim" ]
 		}
 	},
 
-	"admin/network/lpac/overview": {
+	"admin/modem/esim/overview": {
 		"title": "Overview",
 		"order": 10,
 		"action": {
@@ -19,7 +26,7 @@
 		}
 	},
 
-	"admin/network/lpac/profiles": {
+	"admin/modem/esim/profiles": {
 		"title": "Profiles",
 		"order": 20,
 		"action": {
@@ -28,7 +35,7 @@
 		}
 	},
 
-	"admin/network/lpac/download": {
+	"admin/modem/esim/download": {
 		"title": "Download",
 		"order": 30,
 		"action": {
@@ -37,7 +44,7 @@
 		}
 	},
 
-	"admin/network/lpac/notifications": {
+	"admin/modem/esim/notifications": {
 		"title": "Notifications",
 		"order": 40,
 		"action": {
@@ -46,7 +53,7 @@
 		}
 	},
 
-	"admin/network/lpac/settings": {
+	"admin/modem/esim/settings": {
 		"title": "Settings",
 		"order": 50,
 		"action": {

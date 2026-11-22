@@ -361,7 +361,7 @@ function backendSetupNotice() {
 		E('div', { 'class': 'cbi-page-actions' }, [
 			E('a', {
 				'class': 'btn cbi-button cbi-button-action',
-				'href': L.url('admin/network/lpac/settings')
+				'href': L.url('admin/modem/esim/settings')
 			}, [ _('Open Settings') ])
 		])
 	]);

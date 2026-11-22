@@ -1,7 +1,7 @@
 # Bundled lpac package
 
 This directory is a downstream OpenWrt package definition used only by the
-bundled GitHub releases of `luci-app-lpac`. It downloads the authoritative
+bundled GitHub releases of `luci-app-esim`. It downloads the authoritative
 lpac `v2.3.0` source archive instead of vendoring a modified source tree.
 
 The package uses the official OpenWrt version format `2.3.0-r5`. The runtime
@@ -53,7 +53,7 @@ slot-mapping bypass disabled by default, matching the official OpenWrt package.
 PC/SC compilation is disabled by default and is not managed by the LuCI
 application on this branch.
 LuCI exposes the bypass at
-`Network → eSIM Manager → Settings → MBIM backend`.
+`Modem → eSIM Manager → Settings → MBIM backend`.
 Set `lpac.mbim.skip_slot_mapping=1` only on devices that must use the modem's
 currently selected slot without querying or changing MBIM Device Slot Mapping.
 While the bypass is enabled,

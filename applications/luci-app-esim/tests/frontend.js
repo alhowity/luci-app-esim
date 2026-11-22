@@ -1031,7 +1031,7 @@ async function testBackendSetupGate() {
 			assert.strictEqual(link.length, 1,
 				`${testCase.file} should expose one Settings action`);
 			assert.strictEqual(link[0].attrs.href,
-				'/cgi-bin/luci/admin/network/lpac/settings');
+				'/cgi-bin/luci/admin/modem/esim/settings');
 
 			if (testCase.polling)
 				assert.strictEqual(pollEntries.length, pollCount,
@@ -2020,9 +2020,9 @@ async function testNotificationJobs() {
 }
 
 const menu = JSON.parse(fs.readFileSync(path.join(appRoot,
-	'root/usr/share/luci/menu.d/luci-app-lpac.json'), 'utf8'));
+	'root/usr/share/luci/menu.d/luci-app-esim.json'), 'utf8'));
 const acl = JSON.parse(fs.readFileSync(path.join(appRoot,
-	'root/usr/share/rpcd/acl.d/luci-app-lpac.json'), 'utf8'))['luci-app-lpac'];
+	'root/usr/share/rpcd/acl.d/luci-app-esim.json'), 'utf8'))['luci-app-esim'];
 const backendSource = fs.readFileSync(path.join(appRoot,
 	'root/usr/share/rpcd/ucode/luci.lpac'), 'utf8');
 const backendMethods = Array.from(backendSource.matchAll(/^\t([a-z_]+): \{$/gm),
@@ -2044,18 +2044,25 @@ assert.ok(acl.read.ubus['luci.lpac'].includes('get_profile_refresh_preference'),
 	'the read ACL should permit reading the profile refresh preference');
 assert.ok(acl.write.ubus['luci.lpac'].includes('set_profile_refresh_preference'),
 	'the write ACL should permit changing the profile refresh preference');
-assert.strictEqual(menu['admin/modem'], undefined,
-	'the application should not introduce a nonstandard top-level Modem menu');
-assert.strictEqual(menu['admin/network/lpac'].title, 'eSIM Manager',
-	'eSIM Manager should live below the standard Network menu');
-assert.strictEqual(menu['admin/network/lpac'].order, 90,
-	'eSIM Manager should follow the standard Network entries');
+assert.strictEqual(menu['admin/modem'].title, 'Modem',
+	'the application should provide the shared top-level Modem menu');
+assert.strictEqual(menu['admin/modem'].order, undefined,
+	'the shared Modem menu must not override the order set by other modem apps');
+assert.strictEqual(menu['admin/modem'].action.type, 'firstchild',
+	'the Modem menu should open its first entry');
+assert.strictEqual(Object.keys(menu).filter(function(key) {
+	return key.startsWith('admin/network');
+}).length, 0, 'eSIM Manager should no longer appear below Network');
+assert.strictEqual(menu['admin/modem/esim'].title, 'eSIM Manager',
+	'eSIM Manager should live below the Modem menu');
+assert.deepStrictEqual(menu['admin/modem/esim'].depends.acl, [ 'luci-app-esim' ],
+	'the eSIM Manager menu should require the luci-app-esim ACL');
 [ 'overview', 'profiles', 'download', 'notifications', 'settings' ].forEach(function(page) {
-	assert.ok(menu[`admin/network/lpac/${page}`],
-		`${page} should be a child tab below Network / eSIM Manager`);
+	assert.ok(menu[`admin/modem/esim/${page}`],
+		`${page} should be a child tab below Modem / eSIM Manager`);
 });
-assert.strictEqual(menu['admin/network/lpac'].action.type, 'firstchild',
-	'the Network entry should open its first application tab');
+assert.strictEqual(menu['admin/modem/esim'].action.type, 'firstchild',
+	'the eSIM Manager entry should open its first application tab');
 
 const profileCss = fs.readFileSync(path.join(appRoot,
 	'htdocs/luci-static/resources/view/lpac/profiles.css'), 'utf8');

@@ -1,6 +1,7 @@
-# luci-app-lpac
+# luci-app-esim
 
-`luci-app-lpac` is a clean-room LuCI frontend for the official OpenWrt
+`luci-app-esim` (formerly `luci-app-lpac`) is a clean-room LuCI frontend for
+the official OpenWrt
 [`lpac`](https://github.com/openwrt/packages/tree/master/utils/lpac) package.
 It uses `/usr/bin/lpac` and `/etc/config/lpac` as provided by that package and
 does not bundle a second lpac build, modem manager, or hardware-specific
@@ -259,12 +260,12 @@ app-owned UCI updates cannot overwrite each other.
 The package targets the LuCI `master` branch. Before submission, run:
 
 ```sh
-npx eslint applications/luci-app-lpac
-applications/luci-app-lpac/tests/run-tests.sh
-node applications/luci-app-lpac/tests/frontend.js
+npx eslint applications/luci-app-esim
+applications/luci-app-esim/tests/run-tests.sh
+node applications/luci-app-esim/tests/frontend.js
 git diff --check
-./build/i18n-scan.pl applications/luci-app-lpac \
-  > applications/luci-app-lpac/po/templates/lpac.pot
+./build/i18n-scan.pl applications/luci-app-esim \
+  > applications/luci-app-esim/po/templates/lpac.pot
 ```
 
 OpenWrt package compilation should use the matching SDK and official package

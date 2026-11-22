@@ -48,8 +48,8 @@ jobs:
           mkdir -p build
           git clone --filter=blob:none --depth 1 \
             https://github.com/openwrt/luci.git build/luci
-          rm -rf build/luci/applications/luci-app-lpac
-          cp -a applications/luci-app-lpac build/luci/applications/
+          rm -rf build/luci/applications/luci-app-esim
+          cp -a applications/luci-app-esim build/luci/applications/
           npm install --prefix build/luci --ignore-scripts --no-audit --no-fund
 
       - name: Validate LuCI source and translations
@@ -58,35 +58,35 @@ jobs:
           set -euxo pipefail
           (
             cd build/luci
-            find applications/luci-app-lpac -type f \
+            find applications/luci-app-esim -type f \
               \( -name '*.js' -o -name '*.json' -o -name '*.md' \) \
               -print0 | xargs -0 ./node_modules/.bin/eslint
-            ./build/i18n-scan.pl applications/luci-app-lpac \
+            ./build/i18n-scan.pl applications/luci-app-esim \
               > "${GITHUB_WORKSPACE}/build/lpac.pot"
           )
 
           while IFS= read -r file; do
             node --check "$file"
-          done < <(find applications/luci-app-lpac/htdocs -type f -name '*.js' -print)
+          done < <(find applications/luci-app-esim/htdocs -type f -name '*.js' -print)
 
-          node applications/luci-app-lpac/tests/frontend.js
+          node applications/luci-app-esim/tests/frontend.js
 
           python3 - <<'PY'
           import json
           from pathlib import Path
 
-          for path in Path('applications/luci-app-lpac/root').rglob('*.json'):
+          for path in Path('applications/luci-app-esim/root').rglob('*.json'):
               json.loads(path.read_text())
           PY
 
-          diff -u applications/luci-app-lpac/po/templates/lpac.pot build/lpac.pot
+          diff -u applications/luci-app-esim/po/templates/lpac.pot build/lpac.pot
           msgfmt --check --check-format \
-            -o /dev/null applications/luci-app-lpac/po/templates/lpac.pot
-          shellcheck applications/luci-app-lpac/tests/run-tests.sh
-          shellcheck applications/luci-app-lpac/tests/run-uci-compat.sh
-          shellcheck applications/luci-app-lpac/tests/run-supervisor-integration.sh
+            -o /dev/null applications/luci-app-esim/po/templates/lpac.pot
+          shellcheck applications/luci-app-esim/tests/run-tests.sh
+          shellcheck applications/luci-app-esim/tests/run-uci-compat.sh
+          shellcheck applications/luci-app-esim/tests/run-supervisor-integration.sh
           shellcheck \
-            applications/luci-app-lpac/root/usr/libexec/luci-lpac-supervisor \
+            applications/luci-app-esim/root/usr/libexec/luci-lpac-supervisor \
             packages/lpac/files/lpac.sh \
             packages/lpac/test-patch-contracts.sh \
             packages/lpac/test-version.sh
@@ -260,7 +260,7 @@ jobs:
           LD_LIBRARY_PATH="${GITHUB_WORKSPACE}/build/host/lib" \
           REQUIRE_UCI=1 \
           UCI_BIN="${GITHUB_WORKSPACE}/build/host/bin/uci" \
-            applications/luci-app-lpac/tests/run-uci-compat.sh
+            applications/luci-app-esim/tests/run-uci-compat.sh
 
           mkdir -p build/ucode
           git -C build/ucode init
@@ -319,14 +319,14 @@ jobs:
             build/ucode-24-out; do
             echo "Testing with ${output_dir}"
             PATH="${GITHUB_WORKSPACE}/${output_dir}:${PATH}" \
-              applications/luci-app-lpac/tests/run-tests.sh
+              applications/luci-app-esim/tests/run-tests.sh
             "${output_dir}/ucode" \
               -c,dynlink=fs,dynlink=ubus,dynlink=uci,dynlink=uloop \
               -o /dev/null \
-              applications/luci-app-lpac/root/usr/share/rpcd/ucode/luci.lpac
+              applications/luci-app-esim/root/usr/share/rpcd/ucode/luci.lpac
 
             UCODE_BIN="${GITHUB_WORKSPACE}/${output_dir}/ucode" \
             UCODE_MODULE_DIR="${GITHUB_WORKSPACE}/${output_dir}" \
             UCODE_RUNTIME_LIB_DIR="${GITHUB_WORKSPACE}/build/host/lib" \
-              applications/luci-app-lpac/tests/run-supervisor-integration.sh
+              applications/luci-app-esim/tests/run-supervisor-integration.sh
           done

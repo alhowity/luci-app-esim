@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible luci-app-lpac problem
+description: Report a reproducible luci-app-esim problem
 title: '[bug] '
 labels:
   - bug
