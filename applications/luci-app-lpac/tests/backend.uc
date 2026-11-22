@@ -876,6 +876,26 @@ same(global.TEST_READLINK_CALLS, [
 
 reset();
 global.TEST_GLOB_RESULTS = {
+	'/dev/wwan*qmi*': [],
+	'/dev/wwan*mbim*': [],
+	'/dev/cdc-wdm*': [ '/dev/cdc-wdm0', '/dev/cdc-wdm1' ]
+};
+global.TEST_READLINK_RESULTS = {
+	'/sys/class/usbmisc/cdc-wdm0/device/driver':
+		'../../../../../../bus/usb/drivers/qmi_wwan_q',
+	'/sys/class/usbmisc/cdc-wdm1/device/driver':
+		'../../../../../../bus/usb/drivers/qmi_wwan_qx'
+};
+result = invoke('list_apdu_devices', { backend: 'uqmi' });
+same(result.data.devices, [
+	{ value: '/dev/cdc-wdm0', name: 'cdc-wdm0 (qmi_wwan_q)' }
+], 'QMI detection accepts the Quectel qmi_wwan_q driver binding exactly');
+result = invoke('list_apdu_devices', { backend: 'mbim' });
+same(result.data.devices, [],
+	'MBIM detection does not accept Quectel QMI driver bindings');
+
+reset();
+global.TEST_GLOB_RESULTS = {
 	'/dev/wwan*mbim*': [ '/dev/wwan1mbim0', '/dev/wwan1mbim0', '/dev/wwan-mbim' ],
 	'/dev/cdc-wdm*': [ '/dev/cdc-wdm0', '/dev/cdc-wdm1' ]
 };

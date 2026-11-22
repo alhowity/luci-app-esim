@@ -1,0 +1,267 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 16:00:00 +0000
+Subject: [PATCH] driver: uqmi: report errors on stderr and allow UIM slot 2
+
+The uqmi backend printed its diagnostics with printf(), mixing plain text
+into lpac's newline-delimited JSON on stdout, and discarded uqmi's own
+error text (for example "Not supported"). Write diagnostics to stderr and
+include the first line uqmi printed.
+
+Check the uqmi exit status, accumulate multi-line output instead of
+overwriting it, reject a missing or zero logical channel, validate the
+APDU response length, and skip client release when no client was
+allocated.
+
+Add LPAC_QMI_UIM_SLOT (1 or 2, default 1) for modems such as the Quectel
+RM551E-GL when the eUICC card sits in the second SIM slot. Fall back to
+/dev/cdc-wdm0 when LPAC_QMI_DEV is unset.
+---
+ driver/apdu/uqmi.c | 117 ++++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 84 insertions(+), 33 deletions(-)
+
+diff --git a/driver/apdu/uqmi.c b/driver/apdu/uqmi.c
+index 95c59f1..e8d247b 100644
+--- a/driver/apdu/uqmi.c
++++ b/driver/apdu/uqmi.c
+@@ -14,9 +14,9 @@
+ #include <euicc/interface.h>
+ #include <euicc/hexutil.h>
+ 
+-static FILE *fuart;
+ static int client_id = 0;
+ static int logic_channel = 0;
++static int uim_slot = 1;
+ static char *devpath = NULL;
+ 
+ 
+@@ -29,7 +29,7 @@ static int uqmi_execute_command(const char *command, char *buf, size_t bufsize)
+     int debug = debug_str ? atoi(debug_str) : 0;
+ 
+     if (debug)
+-        printf("UQMI_DEBUG_TX: %s\n", command);
++        fprintf(stderr, "UQMI_DEBUG_TX: %s\n", command);
+ 
+     if (snprintf(final_command, sizeof(final_command), "uqmi -s -d %s %s", devpath, command) >= sizeof(final_command))
+     {
+@@ -46,32 +46,51 @@ static int uqmi_execute_command(const char *command, char *buf, size_t bufsize)
+ 
+     remaining = buf;
+     if (buf) {
+-        while (fgets(remaining, bufsize - (remaining - buf), fp) != NULL)
++        buf[0] = '\0';
++        while (bufsize - (remaining - buf) > 1 &&
++               fgets(remaining, bufsize - (remaining - buf), fp) != NULL)
+         {
+-            /* Read to buffer */
++            remaining += strlen(remaining);
+         }
+         if (debug)
+-            printf("UQMI_DEBUG_RX: %s", buf);
++            fprintf(stderr, "UQMI_DEBUG_RX: %s", buf);
++    } else {
++        char discard[256];
++
++        while (fgets(discard, sizeof(discard), fp) != NULL)
++        {
++            /* Drain output so uqmi never blocks on a full pipe. */
++        }
+     }
+ 
+-    pclose(fp);
++    if (pclose(fp) != 0)
++    {
++        return -1;
++    }
+     return 0;
+ }
+ 
++static void uqmi_report_failure(const char *what, const char *output)
++{
++    size_t len = output ? strcspn(output, "\r\n") : 0;
++
++    if (len)
++        fprintf(stderr, "uqmi %s failed: %.*s\n", what, (int)len, output);
++    else
++        fprintf(stderr, "uqmi %s failed\n", what);
++}
++
+ static int uqmi_open_client()
+ {
+     char buffer[2048] = {};
+     int ret;
+ 
+     ret = uqmi_execute_command("--get-client-id uim", buffer, sizeof(buffer));
+-    if (ret)
+-    {
+-        return -1;
+-    }
+-
+-    client_id = atoi(buffer);
+-    if (client_id == 0)
++    client_id = ret ? 0 : atoi(buffer);
++    if (client_id <= 0)
+     {
++        client_id = 0;
++        uqmi_report_failure("UIM client allocation", buffer);
+         return -1;
+     }
+ 
+@@ -80,9 +99,29 @@ static int uqmi_open_client()
+ 
+ static int apdu_interface_connect(struct euicc_ctx *ctx)
+ {
++    const char *slot = getenv("LPAC_QMI_UIM_SLOT");
++
+     client_id = 0;
+     logic_channel = 0;
++    uim_slot = 1;
+     devpath = getenv("LPAC_QMI_DEV");
++    if (devpath == NULL || devpath[0] == '\0')
++    {
++        devpath = "/dev/cdc-wdm0";
++    }
++
++    if (slot != NULL && slot[0] != '\0')
++    {
++        if (strcmp(slot, "1") == 0)
++            uim_slot = 1;
++        else if (strcmp(slot, "2") == 0)
++            uim_slot = 2;
++        else
++        {
++            fprintf(stderr, "Invalid LPAC_QMI_UIM_SLOT '%s', expected 1 or 2\n", slot);
++            return -1;
++        }
++    }
+ 
+     return uqmi_open_client();
+ }
+@@ -91,6 +130,12 @@ static void apdu_interface_disconnect(struct euicc_ctx *ctx)
+ {
+     char command[64] = {};
+ 
++    if (!client_id)
++    {
++        logic_channel = 0;
++        return;
++    }
++
+     snprintf(command, sizeof(command), "--set-client-id uim,%d --release-client-id uim", client_id);
+     uqmi_execute_command(command, NULL, 0);
+ 
+@@ -123,36 +168,40 @@ static int apdu_interface_transmit(struct euicc_ctx *ctx, uint8_t **rx, uint32_t
+         snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%02X", (uint8_t)(tx[i] & 0xFF));
+     }
+ 
+-    snprintf(cmd, sizeof(cmd), "--set-client-id uim,%d --keep-client-id uim --uim-slot 1 --uim-channel-id %d --uim-apdu-send \"%s\"",
+-             client_id, logic_channel, buf);
+-    uqmi_execute_command(cmd, buf, sizeof(buf));
++    snprintf(cmd, sizeof(cmd), "--set-client-id uim,%d --keep-client-id uim --uim-slot %d --uim-channel-id %d --uim-apdu-send \"%s\"",
++             client_id, uim_slot, logic_channel, buf);
++    if (uqmi_execute_command(cmd, buf, sizeof(buf)))
++    {
++        uqmi_report_failure("APDU transmit", buf);
++        goto fail;
++    }
+ 
+     json = strstr(buf, "{");
+     if (!json)
+     {
+-        printf("No JSON found\n");
++        uqmi_report_failure("APDU transmit", buf);
+         goto fail;
+     }
+ 
+     root = cJSON_Parse(json);
+     if (!root)
+     {
+-        printf("Failed to parse JSON\n");
++        fprintf(stderr, "uqmi APDU transmit returned invalid JSON\n");
+         goto fail;
+     }
+ 
+     jtmp = cJSON_GetObjectItem(root, "response");
+-    if (!jtmp || !cJSON_IsString(jtmp))
++    if (!jtmp || !cJSON_IsString(jtmp) || strlen(jtmp->valuestring) < 4 || strlen(jtmp->valuestring) % 2)
+     {
+-        printf("Failed to get response\n");
++        fprintf(stderr, "uqmi APDU transmit returned no valid response\n");
+         goto fail;
+     }
+ 
+     *rx_len = strlen(jtmp->valuestring) / 2;
+     *rx = malloc(*rx_len);
+-    if (euicc_hexutil_hex2bin_r(*rx, *rx_len, jtmp->valuestring, strlen(jtmp->valuestring)) < 0)
++    if (!*rx || euicc_hexutil_hex2bin_r(*rx, *rx_len, jtmp->valuestring, strlen(jtmp->valuestring)) < 0)
+     {
+-        printf("Failed to convert hex '%s' to binary\n", jtmp->valuestring);
++        fprintf(stderr, "uqmi APDU transmit returned invalid hex\n");
+         goto fail;
+     }
+ 
+@@ -164,10 +213,8 @@ fail:
+         cJSON_Delete(root);
+     }
+ 
+-    if (*rx)
+-    {
+-        free(*rx);
+-    }
++    free(*rx);
++    *rx = NULL;
+     *rx_len = 0;
+     return -1;
+ }
+@@ -189,32 +236,36 @@ static int apdu_interface_logic_channel_open(struct euicc_ctx *ctx, const uint8_
+         return logic_channel;
+     }
+ 
+-    snprintf(cmd, sizeof(cmd), "--set-client-id uim,%d --keep-client-id uim --uim-slot 1 --uim-channel-open ", client_id);
++    snprintf(cmd, sizeof(cmd), "--set-client-id uim,%d --keep-client-id uim --uim-slot %d --uim-channel-open ", client_id, uim_slot);
+     for (int i = 0; i < aid_len; i++)
+     {
+         snprintf(cmd + strlen(cmd), sizeof(cmd) - strlen(cmd), "%02X", (uint8_t)(aid[i] & 0xFF));
+     }
+ 
+-    uqmi_execute_command(cmd, buf, sizeof(buf));
++    if (uqmi_execute_command(cmd, buf, sizeof(buf)))
++    {
++        uqmi_report_failure("logical channel open", buf);
++        return -1;
++    }
+ 
+     json = strstr(buf, "{");
+     if (!json)
+     {
+-        printf("No JSON found\n");
++        uqmi_report_failure("logical channel open", buf);
+         return -1;
+     }
+ 
+     root = cJSON_Parse(json);
+     if (!root)
+     {
+-        printf("Failed to parse JSON\n");
++        fprintf(stderr, "uqmi logical channel open returned invalid JSON\n");
+         return -1;
+     }
+ 
+     jtmp = cJSON_GetObjectItem(root, "channel_id");
+-    if (!jtmp || !cJSON_IsNumber(jtmp))
++    if (!jtmp || !cJSON_IsNumber(jtmp) || jtmp->valueint <= 0 || jtmp->valueint > 19)
+     {
+-        printf("Failed to get channel_id\n");
++        fprintf(stderr, "uqmi logical channel open returned no usable channel (slot %d)\n", uim_slot);
+         cJSON_Delete(root);
+         return -1;
+     }
+@@ -234,7 +285,7 @@ static void apdu_interface_logic_channel_close(struct euicc_ctx *ctx, uint8_t ch
+         return;
+     }
+ 
+-    snprintf(cmd, sizeof(cmd), "--set-client-id uim,%d --keep-client-id uim --uim-slot 1 --uim-channel-id %d --uim-channel-close", client_id, logic_channel);
++    snprintf(cmd, sizeof(cmd), "--set-client-id uim,%d --keep-client-id uim --uim-slot %d --uim-channel-id %d --uim-channel-close", client_id, uim_slot, logic_channel);
+     uqmi_execute_command(cmd, NULL, 0);
+     logic_channel = 0;
+     return;

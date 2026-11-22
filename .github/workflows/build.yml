@@ -26,12 +26,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - openwrt_version: '25.12.5'
-            sdk_arch: x86_64-25.12.5
+          # Banana Pi BPI-R4 (mediatek/filogic) uses aarch64_cortex-a53.
+          - openwrt_version: '25.12.6'
+            sdk_arch: aarch64_cortex-a53-25.12.6
             luci_branch: openwrt-25.12
             package_glob: luci-app-lpac-*.apk
           - openwrt_version: snapshot
-            sdk_arch: x86_64
+            sdk_arch: aarch64_cortex-a53
             luci_branch: master
             package_glob: luci-app-lpac-*.apk
 

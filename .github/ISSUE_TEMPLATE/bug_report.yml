@@ -19,7 +19,7 @@ body:
     id: lpac
     attributes:
       label: lpac package version
-      placeholder: 2.3.0-r4
+      placeholder: 2.3.0-r5
     validations:
       required: true
   - type: dropdown

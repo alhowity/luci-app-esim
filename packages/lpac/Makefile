@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=lpac
 PKG_VERSION:=2.3.0
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/estkme-group/lpac/tar.gz/refs/tags/v$(PKG_VERSION)?
@@ -36,7 +36,8 @@ define Package/lpac/description
   lpac is an eUICC eSIM LPA manager written in C. This downstream
   compatibility build uses lpac v2.3.0 with the upstream environment and
   version fixes, detailed SM-DS discovery, strict notification sequence
-  handling, and selected fixes through lpac pull request 444.
+  handling, selected fixes through lpac pull request 467, and AT/uqmi
+  compatibility fixes for Quectel modems such as the RM551E-GL.
 endef
 
 define Package/lpac/config
