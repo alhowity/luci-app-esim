@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y cmake gettext libcurl4-openssl-dev libjson-c-dev pkg-config procps shellcheck util-linux
+          sudo apt-get install -y cmake gettext libcurl4-openssl-dev libjson-c-dev pkg-config procps quilt shellcheck util-linux
 
       - name: Prepare LuCI validation tree
         shell: bash
@@ -138,6 +138,28 @@ jobs:
             'packages/lpac/patches/0080-driver-at-tolerate-quectel-responses.patch'
           printf '%s\n' "${patch_files[@]}" | grep -Fx \
             'packages/lpac/patches/0081-driver-uqmi-report-errors-and-allow-slot-2.patch'
+
+          # Run the same quilt refresh as the OpenWrt SDK; it fails the
+          # package build with "Dirty patches detected" if any patch changes.
+          mkdir -p build/lpac-quilt
+          tar -xzf "${source_archive}" \
+            -C build/lpac-quilt --strip-components=1
+          cp -a packages/lpac/patches build/lpac-quilt/patches
+          (cd build/lpac-quilt/patches && ls -1 *.patch > series)
+          (
+            cd build/lpac-quilt
+            export QUILT_PATCHES=patches
+            while quilt --quiltrc=- next >/dev/null 2>&1 &&
+                  quilt --quiltrc=- push >/dev/null; do
+              QUILT_DIFF_OPTS='-p' quilt --quiltrc=- refresh \
+                -p ab --no-index --no-timestamps
+            done
+            ! quilt --quiltrc=- next >/dev/null 2>&1
+          )
+          for patch_file in packages/lpac/patches/*.patch; do
+            cmp "${patch_file}" \
+              "build/lpac-quilt/patches/$(basename "${patch_file}")"
+          done
 
           for patch_file in packages/lpac/patches/*.patch; do
             patch -d build/lpac-source -p1 --forward < "${patch_file}"

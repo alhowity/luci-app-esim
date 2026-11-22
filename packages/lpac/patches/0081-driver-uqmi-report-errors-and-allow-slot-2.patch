@@ -20,8 +20,6 @@ RM551E-GL when the eUICC card sits in the second SIM slot. Fall back to
  driver/apdu/uqmi.c | 117 ++++++++++++++++++++++++++++++++++++++---------------
  1 file changed, 84 insertions(+), 33 deletions(-)
 
-diff --git a/driver/apdu/uqmi.c b/driver/apdu/uqmi.c
-index 95c59f1..e8d247b 100644
 --- a/driver/apdu/uqmi.c
 +++ b/driver/apdu/uqmi.c
 @@ -14,9 +14,9 @@
@@ -35,7 +33,7 @@ index 95c59f1..e8d247b 100644
  static char *devpath = NULL;
  
  
-@@ -29,7 +29,7 @@ static int uqmi_execute_command(const char *command, char *buf, size_t bufsize)
+@@ -29,7 +29,7 @@ static int uqmi_execute_command(const ch
      int debug = debug_str ? atoi(debug_str) : 0;
  
      if (debug)
@@ -44,7 +42,7 @@ index 95c59f1..e8d247b 100644
  
      if (snprintf(final_command, sizeof(final_command), "uqmi -s -d %s %s", devpath, command) >= sizeof(final_command))
      {
-@@ -46,32 +46,51 @@ static int uqmi_execute_command(const char *command, char *buf, size_t bufsize)
+@@ -46,32 +46,51 @@ static int uqmi_execute_command(const ch
  
      remaining = buf;
      if (buf) {
@@ -137,7 +135,7 @@ index 95c59f1..e8d247b 100644
  
      return uqmi_open_client();
  }
-@@ -91,6 +130,12 @@ static void apdu_interface_disconnect(struct euicc_ctx *ctx)
+@@ -91,6 +130,12 @@ static void apdu_interface_disconnect(st
  {
      char command[64] = {};
  
@@ -150,7 +148,7 @@ index 95c59f1..e8d247b 100644
      snprintf(command, sizeof(command), "--set-client-id uim,%d --release-client-id uim", client_id);
      uqmi_execute_command(command, NULL, 0);
  
-@@ -123,36 +168,40 @@ static int apdu_interface_transmit(struct euicc_ctx *ctx, uint8_t **rx, uint32_t
+@@ -123,36 +168,40 @@ static int apdu_interface_transmit(struc
          snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%02X", (uint8_t)(tx[i] & 0xFF));
      }
  
@@ -213,7 +211,7 @@ index 95c59f1..e8d247b 100644
      *rx_len = 0;
      return -1;
  }
-@@ -189,32 +236,36 @@ static int apdu_interface_logic_channel_open(struct euicc_ctx *ctx, const uint8_
+@@ -189,32 +236,36 @@ static int apdu_interface_logic_channel_
          return logic_channel;
      }
  
@@ -256,7 +254,7 @@ index 95c59f1..e8d247b 100644
          cJSON_Delete(root);
          return -1;
      }
-@@ -234,7 +285,7 @@ static void apdu_interface_logic_channel_close(struct euicc_ctx *ctx, uint8_t ch
+@@ -234,7 +285,7 @@ static void apdu_interface_logic_channel
          return;
      }
  
